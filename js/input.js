@@ -132,6 +132,7 @@ document.addEventListener('pointerup', (e) => {
     if (sx >= 0 && sx <= W && sy >= 0 && sy <= H) {
       handleDragDrop(sx, sy, handIdx);
     } else {
+      // 拖到画布外：视为放弃
       state.selectedHand = -1;
       renderHand();
     }
@@ -150,7 +151,6 @@ document.addEventListener('pointercancel', (e) => {
   if (pinchState.active && activePointers.size < 2) {
     exitPinch();
   }
-  // 拖拽被系统取消：安全回退，避免手牌卡住
   if (dragState.active) {
     dragState.active = false;
     dragState.handIndex = -1;
@@ -177,11 +177,11 @@ function handleDragDrop(sx, sy, handIdx) {
     if (ok) {
       state.hand.splice(handIdx, 1);
       state.selectedHand = -1;
-      renderHand();
     } else {
-      state.selectedHand = -1;
-      renderHand();
+      // ★ 合成失败：保留选中，玩家可继续尝试或换牌
+      state.selectedHand = handIdx;
     }
+    renderHand();
     return;
   }
   if (tryPlace(wx, wy)) {
@@ -191,7 +191,8 @@ function handleDragDrop(sx, sy, handIdx) {
     renderHand();
   } else {
     flashMessage('无法放置', '#ff5a5a');
-    state.selectedHand = -1;
+    // ★ 放置失败：保留选中
+    state.selectedHand = handIdx;
     renderHand();
   }
 }
@@ -333,7 +334,6 @@ canvas.addEventListener('pointermove', (e) => {
 canvas.addEventListener('pointerup', (e) => {
   activePointers.delete(e.pointerId);
 
-  // ★ 先无条件保存并清理画布拖拽状态，避免被任何提前返回卡住
   const wasPointerDown = pointerDown;
   const wasHasDragged = hasDragged;
   const wasActiveButton = activeButton;
@@ -347,10 +347,8 @@ canvas.addEventListener('pointerup', (e) => {
     return;
   }
 
-  // 手牌拖拽走 document 的 pointerup 处理，这里不需要管
   if (dragState.active) return;
 
-  // 只有当按下时确实开始过拖拽且没移动 → 判定为点击
   if (!wasPointerDown) return;
   if (!wasHasDragged && !state.paused && !state.gameOver && state.running) {
     const rect = canvas.getBoundingClientRect();
@@ -432,7 +430,7 @@ function handleClick(sx, sy, button) {
         renderHand();
         updateHUD();
       } else {
-        state.selectedHand = -1;
+        // ★ 合成失败：保留选中，方便重试或换牌
         renderHand();
         updateHUD();
       }
@@ -446,7 +444,7 @@ function handleClick(sx, sy, button) {
       updateHUD();
     } else {
       flashMessage('无法放置', '#ff5a5a');
-      state.selectedHand = -1;
+      // ★ 放置失败：保留选中
       renderHand();
       updateHUD();
     }

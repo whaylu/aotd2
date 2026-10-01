@@ -45,6 +45,10 @@ function describeBulletMechanics(def) {
   if (def.reflect) {
     lines.push(`反伤：被攻击时反弹 ${Math.round(def.reflect * 100)}%`);
   }
+  // ★ 辐射增伤（攻击塔也有的情况：UO / UO₂ / UF₆ / U₃O₈）
+  if (def.radiationBonus) {
+    lines.push(`<span style="color:#7adb7a">辐射增伤：所有敌人受伤 +${Math.round(def.radiationBonus * 100)}%</span>`);
+  }
   return lines;
 }
 
@@ -78,6 +82,56 @@ function getUnitTags(unit) {
     if (t) out.push({ label: t.name, cat: t.cat, desc: t.desc });
   }
 
+  // 1.5) 可晶格提示（仅单原子、且该元素在 LATTICE_ELEMENTS 里）
+  if (!def.isLattice) {
+    const atoms = def.atoms || [];
+    if (atoms.length === 1 && LATTICE_ELEMENTS[atoms[0]]) {
+      const elem = atoms[0];
+      const cfg = LATTICE_ELEMENTS[elem];
+      out.push({
+        label: '可晶格',
+        cat: 'self',
+        desc: `可与同种 ${elem} 原子叠加形成晶格`,
+      });
+    }
+  }
+
+  // 1.6) ★ 晶格专属：显示层数 + 当前机制
+  if (def.isLattice) {
+    const elem = def.latticeElem;
+    const n = def.latticeN;
+    const cfg = LATTICE_ELEMENTS[elem];
+    const maxN = cfg ? cfg.maxN : '?';
+    out.push({
+      label: `×${n}`,
+      cat: 'self',
+      desc: `晶格层数 · ${n}/${maxN}\n同种 ${elem} 原子叠加而成`,
+    });
+    if (cfg) {
+      let active = null;
+      for (const s of cfg.special) {
+        if (n >= s.n) active = s;
+      }
+      if (active) {
+        const modeNames = {
+          splash: '溅射', burst: '多发', pierce: '穿透',
+          chain: '连锁', knockback: '击退',
+        };
+        out.push({
+          label: modeNames[active.mode] || active.mode,
+          cat: 'source',
+          desc: `晶格机制 · 从 ×${active.n} 起激活\n${
+            active.mode === 'splash' ? `溅射半径 ${active.radius}` :
+            active.mode === 'burst'  ? `同时攻击 ${active.count} 个目标` :
+            active.mode === 'chain'  ? `弹射 ${active.count} 次` :
+            active.mode === 'knockback' ? `推远 ${active.dist}` :
+            '贯穿直线上的所有敌人'
+          }`,
+        });
+      }
+    }
+  }
+
   // 2) 塔发出的光环（source 类，金色）
   if (def.aura) {
     const a = def.aura;
@@ -98,12 +152,20 @@ function getUnitTags(unit) {
     });
   }
 
-  // 3) 塔发出的全局效果（source 类，金色）
+  // 3) ★ 塔发出的全局效果（global 类，特殊样式）
   if (def.global) {
+    let desc = `发出全局效果 · 影响全场\n（无需范围，全场生效）`;
+    if (def.global === 'radiation' && def.radiationBonus) {
+      desc += `\n辐射增伤：所有敌人受伤 +${Math.round(def.radiationBonus * 100)}%`;
+    } else if (def.global === 'economy' && def.economy) {
+      desc += `\n每 ${def.economy.interval} 秒产出 +${def.economy.gold} 金`;
+    } else if (def.global === 'combustion') {
+      desc += `\n场上所有可燃塔的攻击附加燃烧`;
+    }
     out.push({
       label: def.globalName || def.global,
-      cat: 'source',
-      desc: `发出全局效果 · 影响全场\n（无需范围，全场生效）`,
+      cat: 'global',
+      desc,
     });
   }
 
@@ -161,14 +223,31 @@ function buildUnitMenu(unit) {
 
   if (unit.isIntermediate) {
     lines.push('过渡态 · 无法攻击 · 可继续合成');
+  } else if (def.economy) {
+    lines.push(`全局效果：经济（全场生效）`);
+    lines.push(`每 ${def.economy.interval} 秒产出 <span class="val">+${def.economy.gold}</span> 金`);
+    if (def.radiationBonus) {
+      lines.push(`<span style="color:#7adb7a">辐射增伤：所有敌人受伤 +${Math.round(def.radiationBonus * 100)}%</span>`);
+    }
   } else if (def.attack === 'aura') {
     const desc = describeAura(def.aura);
     if (desc) lines.push(desc);
     if (def.reflect) lines.push(`反伤：被攻击时反弹 ${Math.round(def.reflect * 100)}%`);
+    if (def.radiationBonus) {
+      lines.push(`<span style="color:#7adb7a">辐射增伤：所有敌人受伤 +${Math.round(def.radiationBonus * 100)}%</span>`);
+    }
   } else if (def.attack === 'global') {
-    lines.push(`全局效果：${def.globalName || def.global}（全场生效）`);
+    // ★ 全局塔：显示具体的全局效果和数值
+    let desc = `全局效果：${def.globalName || def.global}（全场生效）`;
+    if (def.global === 'radiation' && def.radiationBonus) {
+      desc += `\n辐射增伤：所有敌人受伤 <span class="val">+${Math.round(def.radiationBonus * 100)}%</span>`;
+    }
+    lines.push(desc);
   } else if (def.attack === 'economy') {
     lines.push(`经济：每 ${def.economy.interval} 秒产出 <span class="val">+${def.economy.gold}</span> 金`);
+    if (def.radiationBonus) {
+      lines.push(`<span style="color:#7adb7a">辐射增伤：所有敌人受伤 +${Math.round(def.radiationBonus * 100)}%</span>`);
+    }
   } else {
     lines.push(`攻击 <span class="val">${unit.atk.toFixed(1)}</span> · 射程 <span class="val">${Math.floor(unit.range)}</span> · CD <span class="val">${unit.cd.toFixed(1)}s</span>`);
     for (const l of describeBulletMechanics(def)) lines.push(l);
@@ -217,6 +296,14 @@ function buildEnemyMenu(enemy) {
       });
     }
   }
+  // ★ 辐射增伤也作为一个 enemy tag 显示（提示玩家敌人正在被辐射削弱）
+  if (state.radiationBonus > 0) {
+    tags.push({
+      label: `辐射 +${Math.round(state.radiationBonus * 100)}%`,
+      cat: 'source',
+      desc: `全局辐射 · 该敌人受到的所有伤害 +${Math.round(state.radiationBonus * 100)}%`,
+    });
+  }
   renderEffectTags(effectsEl, tags);
 
   menuEl.querySelector('.context-btn.sell').classList.add('hidden');
@@ -233,15 +320,28 @@ function buildCoreMenu() {
   const s = Math.floor(state.time % 60);
   const timeStr = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 
-  let info =
+  const info =
     `血量 <span class="${coreHpCls}">${Math.max(0, Math.ceil(state.coreHp))}</span> / <span class="val">${state.coreMaxHp}</span>\n` +
     `当前阶段 <span class="val">${state.stage}</span> · 存活 <span class="val">${timeStr}</span>\n` +
     `当前分数 <span class="val">${state.score}</span>`;
-
-  if (state.hasCombustion) info += '\n已激活全局效果：助燃';
-
   infoEl.innerHTML = info;
-  menuEl.querySelector('.context-effects').classList.add('hidden');
+
+  // ★ 用 eff-tag 小卡显示全局效果，跟塔的标签风格一致
+  const effectsEl = menuEl.querySelector('.context-effects');
+  const tags = [];
+  for (const g of (state.activeGlobals || [])) {
+    let desc = `全局效果 · 由 ${g.count} 座塔提供`;
+    if (g.type === 'radiation') {
+      desc += `\n所有敌人受伤 +${Math.round(g.value * 100)}%`;
+    } else if (g.type === 'combustion') {
+      desc += `\n场上所有可燃塔的攻击附加燃烧`;
+    } else if (g.type === 'economy') {
+      desc += `\n金币持续产出中`;
+    }
+    tags.push({ label: g.name, cat: 'global', desc });
+  }
+  renderEffectTags(effectsEl, tags);
+
   menuEl.querySelector('.context-btn.sell').classList.add('hidden');
 }
 
@@ -252,8 +352,11 @@ function refreshMenuContent() {
     return;
   }
 
-  if (state.selectedCore) {
-    const key = `C|${Math.ceil(state.coreHp)}|${state.stage}|${Math.floor(state.time)}|${state.score}|${state.hasCombustion}`;
+    if (state.selectedCore) {
+    const globalsKey = (state.activeGlobals || [])
+      .map(g => `${g.type}:${g.count}:${Math.round(g.value * 100)}`)
+      .sort().join('|');
+    const key = `C|${Math.ceil(state.coreHp)}|${state.stage}|${Math.floor(state.time)}|${state.score}|${globalsKey}`;
     if (menuTargetRef === 'CORE' && menuCacheKey === key) return;
     menuTargetRef = 'CORE';
     menuCacheKey = key;
@@ -283,9 +386,10 @@ function refreshMenuContent() {
         .map(([k, d]) => `${k}:${Math.round(d.dps)}:${d.timer.toFixed(1)}`)
         .sort().join('|')
     : '';
+  // ★ enemy key 里也带上 radiationBonus
   const key = isEnemy
-    ? `E|${hp}|${target.attacking}|${dotKey}`
-    : `U|${hp}|${target.atk.toFixed(1)}|${Math.floor(target.range)}|${target.cd.toFixed(1)}|${auraKey}`;
+    ? `E|${hp}|${target.attacking}|${dotKey}|${Math.round(state.radiationBonus * 100)}`
+    : `U|${hp}|${target.atk.toFixed(1)}|${Math.floor(target.range)}|${target.cd.toFixed(1)}|${auraKey}|${Math.round(state.radiationBonus * 100)}`;
 
   if (menuTargetRef === target && menuCacheKey === key) return;
   menuTargetRef = target;
@@ -366,7 +470,6 @@ function renderHand() {
     const card = state.hand[i];
     const key = card.key;
     const def = DEFS[key];
-    // ★ 防御：跳过无效 key，避免整个手牌 UI 崩溃
     if (!def) {
       console.warn('[renderHand] 跳过未知 key:', key);
       continue;

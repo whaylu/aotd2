@@ -447,6 +447,13 @@ img { pointer-events:none; -webkit-user-drag:none; user-drag:none; }
 .eff-tag.cat-self   { background: rgba(107,196,255,0.12); border-color: rgba(107,196,255,0.55); color: #6bc4ff; }
 .eff-tag.cat-source { background: rgba(255,209,102,0.12); border-color: rgba(255,209,102,0.55); color: #ffd166; }
 .eff-tag.cat-target { background: rgba(139,214,82,0.12);  border-color: rgba(139,214,82,0.55);  color: #8bd652; }
+.eff-tag.cat-global {
+  background: linear-gradient(135deg, rgba(255, 209, 102, 0.30), rgba(255, 150, 50, 0.28));
+  border-color: #ffb84a;
+  color: #ffd166;
+  font-weight: 600;
+  box-shadow: 0 0 6px rgba(255, 180, 74, 0.35);
+}
 .eff-tag::after {
   content: attr(data-tip); position: absolute;
   top: calc(100% + 6px); left: 0;

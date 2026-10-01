@@ -49,6 +49,8 @@ const state = {
   rolling: false,
   rollMode: 'normal',
   hasCombustion: false,
+  radiationBonus: 0,   // ★ 全局辐射增伤（0~N）
+  activeGlobals: [],   // 当前激活的全局效果列表（由 computeGlobalEffects 填充）
 };
 
 let bulkSellMode = false;

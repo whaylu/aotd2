@@ -4,7 +4,7 @@
 
 function reset() {
   for (const key in DEFS) {
-    if (DEFS[key].isIntermediate) delete DEFS[key];
+    if (DEFS[key].isIntermediate || DEFS[key].isLattice) delete DEFS[key];
   }
   state.gold = 100;
   state.coreHp = CORE_MAX_HP;
@@ -49,6 +49,7 @@ function reset() {
   state.settingsOpen = false;
   state.rolling = false;
   state.rollMode = 'normal';
+  state.radiationBonus = 0;
   bulkSellMode = false;
   bulkSellSet.clear();
   freshHandIndices.clear();

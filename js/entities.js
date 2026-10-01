@@ -134,6 +134,17 @@ function synthesizeWithHand(unit, handKey, handCost) {
   if (!handDef) return false;
   const all = [...unit.atoms, ...handDef.atoms].sort();
 
+  // ★ 晶格化优先：同种可晶格元素持续叠加（C₂、C₃、C₄…）
+  const latticeKey = ensureLatticeDef(getLatticeKey(all));
+  if (latticeKey) {
+    const x = unit.x, y = unit.y;
+    const latDef = DEFS[latticeKey];
+    removeUnit(unit);
+    placeUnit(latticeKey, x, y, totalCost);
+    flashMessage(`晶格 ${latDef.symbol}`, '#a0d0ff');
+    return true;
+  }
+
   const molKey = findMoleculeMatch(all);
   if (molKey) {
     const x = unit.x, y = unit.y;
@@ -174,7 +185,8 @@ function recalcAuras() {
     const auraName = getSourceTagName(def);
     for (const tgt of state.units) {
       if (tgt === src || tgt.isIntermediate) continue;
-      if (Math.hypot(tgt.x - src.x, tgt.y - src.y) < aura.radius) {
+      // ★ 圆相碰判定：目标塔圆与光环圈有任何重叠即生效
+      if (Math.hypot(tgt.x - src.x, tgt.y - src.y) < aura.radius + tgt.radius) {
         const type = aura.type;
         if (!tgt.receivedAuras[type]) {
           tgt.receivedAuras[type] = {
@@ -210,14 +222,35 @@ function recalcAuras() {
 
 function computeGlobalEffects() {
   state.hasCombustion = false;
+  state.radiationBonus = 0;
+
+  const globals = {};   // 按 global key 聚合
+
   for (const u of state.units) {
     if (u.isIntermediate) continue;
     const def = DEFS[u.key];
-    if (def && def.global === 'combustion') {
-      state.hasCombustion = true;
-      break;
+    if (!def) continue;
+
+    if (def.global === 'combustion') state.hasCombustion = true;
+    if (def.global === 'radiation' && def.radiationBonus) {
+      state.radiationBonus += def.radiationBonus;
+    }
+
+    if (def.global) {
+      if (!globals[def.global]) {
+        globals[def.global] = {
+          type: def.global,
+          name: def.globalName || def.global,
+          count: 0,
+          value: 0,
+        };
+      }
+      globals[def.global].count++;
+      if (def.radiationBonus) globals[def.global].value += def.radiationBonus;
     }
   }
+
+  state.activeGlobals = Object.values(globals);
 }
 
 // ---------- 持续伤害 ----------
@@ -255,7 +288,6 @@ function tickDots(e, dt) {
 
 // ---------- 抽卡 ----------
 
-// ★ 加权随机：按 ROLL_WEIGHTS 从 atomKeys 里挑一个
 function pickWeightedKey(atomKeys) {
   let total = 0;
   for (const k of atomKeys) total += (ROLL_WEIGHTS[k] || 1);
@@ -274,7 +306,6 @@ function playRollAnimation(finalKey) {
     const symEl = document.getElementById('rollSymbol');
     const labelEl = document.getElementById('rollLabel');
 
-    // 兜底：DOM 元素缺失时直接 resolve，不阻塞抽卡流程
     if (!overlay || !box || !symEl || !labelEl || !DEFS[finalKey]) {
       console.warn('[playRollAnimation] DOM 或 finalKey 无效，跳过动画');
       resolve();
@@ -282,7 +313,6 @@ function playRollAnimation(finalKey) {
     }
 
     const isFast = state.rollMode === 'fast';
-
     const atomKeys = getUnlockedAtoms(state.stage);
     const totalSpins = isFast ? 6 : 10;
     const baseWait   = isFast ? 32 : 45;
@@ -320,7 +350,6 @@ function playRollAnimation(finalKey) {
         }, holdMs);
         return;
       }
-      // 动画符号也按加权分布滚动
       const rk = pickWeightedKey(atomKeys);
       const rd = DEFS[rk] || finalDef;
       symEl.textContent = rd.symbol;
@@ -363,7 +392,6 @@ async function roll() {
   const atomKeys = getUnlockedAtoms(state.stage);
   const key = pickWeightedKey(atomKeys);
 
-  // 兜底：万一 key 不合法，立刻退款并报错，不进入动画
   if (!key || !DEFS[key]) {
     console.error('[roll] 无效 key:', key, 'atomKeys:', atomKeys);
     state.gold += paid;
@@ -387,7 +415,6 @@ async function roll() {
   } catch (e) {
     console.error('[roll] 动画抛错:', e);
   } finally {
-    // ★ 无论动画成功、抛错、被中断，都恢复状态并发卡
     state.rolling = false;
     if (state.running && !state.gameOver) {
       addHandCard(key, paid);
@@ -552,7 +579,7 @@ function update(dt) {
   for (const u of state.units) {
     if (u.isIntermediate) continue;
     const def = DEFS[u.key];
-    if (!def || def.attack !== 'economy' || !def.economy) continue;
+    if (!def || !def.economy) continue;
     if (u.economyTimer === undefined) u.economyTimer = def.economy.interval;
     u.economyTimer -= dt;
     if (u.economyTimer <= 0) {
@@ -646,7 +673,8 @@ function updateEnemies(dt) {
       const dotDef = DOTS[def.aura.dotKind];
       if (!dotDef) continue;
       const d = Math.hypot(e.x - u.x, e.y - u.y);
-      if (d < def.aura.radius) {
+      // ★ 圆相碰：敌人圆与光环圈有任何重叠即生效
+      if (d < def.aura.radius + e.radius) {
         applyDot(e, def.aura.dotKind, u.atk * def.aura.value, dotDef.duration);
       }
     }

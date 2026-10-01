@@ -16,77 +16,60 @@ const CRIT_CHANCE = 0.10;
 const CRIT_MULT = 2.0;
 
 const ATOM_MASS = {
-  H:1, He:4, C:12, N:14, O:16, F:19, Na:23, Mg:24,
-  Al:27, Si:28, P:31, S:32, Cl:35.5, K:39, Ca:40,
-  Fe:56, Cu:64, Zn:65, Ag:108, Au:197,
+  H:1, He:4, Li:7, B:11, C:12, N:14, O:16, F:19,
+  Na:23, Mg:24, Al:27, Si:28, P:31, S:32, Cl:35.5,
+  K:39, Ca:40, Ti:48, Mn:55, Fe:56, Co:59, Ni:59,
+  Cu:64, Zn:65, Br:80, Ag:108, I:127, Au:197, U:238,
 };
 
-// ============================================================
-// 元素解锁顺序 —— 按原子序排列
-// ============================================================
 const ELEMENT_UNLOCK_ORDER = [
-  'H',   // 1
-  'He',  // 2
-  'C',   // 6
-  'N',   // 7
-  'O',   // 8
-  'F',   // 9
-  'Na',  // 11
-  'Mg',  // 12
-  'Al',  // 13
-  'Si',  // 14
-  'P',   // 15
-  'S',   // 16
-  'Cl',  // 17
-  'K',   // 19
-  'Ca',  // 20
-  'Fe',  // 26
-  'Cu',  // 29
-  'Zn',  // 30
-  'Ag',  // 47
-  'Au',  // 79
+  'H','He','Li','B','C','N','O','F',
+  'Na','Mg','Al','Si','P','S','Cl',
+  'K','Ca','Ti','Mn','Fe','Co','Ni',
+  'Cu','Zn','Br','Ag','I','Au','U',
 ];
 
-// 阶段解锁机制已取消：所有元素从一开始就可抽
 function getUnlockedAtoms(_stage) {
   return ELEMENT_UNLOCK_ORDER.slice();
 }
 
-// ============================================================
-// 抽卡权重 —— 越大越容易抽到
-//   攻击者/常用过渡态 → 高权重
-//   光环/经济         → 低权重
-// ============================================================
 const ROLL_WEIGHTS = {
-  H: 12, C: 12, O: 10,
-  N: 7, Na: 6,
-  S: 5, Cl: 5, Cu: 5, Si: 5, Al: 5,
-  P: 4, F: 4, K: 4, Mg: 4, Zn: 4,
+  H: 14, C: 13, O: 11,
+  N: 8, Na: 7,
+  S: 5, Cl: 5, Cu: 5, Si: 5, Al: 5, Li: 5,
+  P: 4, F: 4, K: 4, Mg: 4, Zn: 4, B: 4, Br: 4,
   Ca: 3, Fe: 3, He: 3, Ag: 3,
-  Au: 2,
+  Mn: 3, Co: 3, Ni: 3, Ti: 3,
+  I: 2, Au: 2,
+  U: 1,   // 极稀有
 };
 
 const TAGS = {
-  bullet:    { name:'子弹',   cat:'self', desc:'发射弹丸命中目标' },
-  chain:     { name:'连锁',   cat:'self', desc:'命中后弹射到附近敌人' },
-  knockback: { name:'击退',   cat:'self', desc:'命中把敌人推远' },
-  splash:    { name:'溅射',   cat:'self', desc:'命中点周围也受伤' },
-  burst:     { name:'多发',   cat:'self', desc:'一次攻击同时打多个目标' },
-  reflect:   { name:'反伤',   cat:'self', desc:'被攻击时反弹部分伤害' },
-  flammable: { name:'可燃',   cat:'self', desc:'场上存在"助燃"时，攻击附加燃烧' },
-  acid:      { name:'酸蚀',   cat:'self', desc:'命中附加酸蚀' },
-  salt:      { name:'盐',     cat:'self', desc:'离子晶体' },
-  water:     { name:'水',     cat:'self', desc:'极性溶剂' },
-  alkali:    { name:'碱金属', cat:'self', desc:'遇水爆炸' },
-  alkaline:  { name:'碱土金属',cat:'self',desc:'护盾/结构金属' },
-  halogen:   { name:'卤素',   cat:'self', desc:'氧化性卤族' },
-  metal:     { name:'金属',   cat:'self', desc:'导电导热' },
-  nonmetal:  { name:'非金属', cat:'self', desc:'非金属元素' },
-  metalloid: { name:'类金属', cat:'self', desc:'半导体性质' },
-  noble:     { name:'稀有气体',cat:'self',desc:'不参与化学反应' },
-  inert:     { name:'惰性',   cat:'self', desc:'化学性质极稳定' },
-  heavy:     { name:'重金属', cat:'self', desc:'密度大、毒性强' },
-  economy:   { name:'经济',   cat:'self', desc:'持续产出金币' },
+  bullet:      { name:'单发',   cat:'self', desc:'单发弹丸命中目标' },
+  chain:       { name:'连锁',   cat:'self', desc:'命中后弹射到附近敌人' },
+  knockback:   { name:'冲击',   cat:'self', desc:'命中把敌人推远' },
+  pierce:      { name:'穿透',   cat:'self', desc:'贯穿直线上的所有敌人' },
+  splash:      { name:'爆散',   cat:'self', desc:'命中点周围也受伤' },
+  burst:       { name:'多发',   cat:'self', desc:'一次攻击同时打多个目标' },
+  reflect:     { name:'反冲',   cat:'self', desc:'被攻击时反弹部分伤害' },
+  flammable:   { name:'可燃',   cat:'self', desc:'场上存在"助燃"时，攻击附加燃烧' },
+  acid:        { name:'酸蚀',   cat:'self', desc:'命中附加酸蚀' },
+  salt:        { name:'盐',     cat:'self', desc:'离子晶体' },
+  water:       { name:'水',     cat:'self', desc:'极性溶剂' },
+  alkali:      { name:'碱金属', cat:'self', desc:'遇水爆炸' },
+  alkaline:    { name:'碱土金属',cat:'self',desc:'护盾/结构金属' },
+  halogen:     { name:'卤素',   cat:'self', desc:'氧化性卤族' },
+  metal:       { name:'金属',   cat:'self', desc:'导电导热' },
+  nonmetal:    { name:'非金属', cat:'self', desc:'非金属元素' },
+  metalloid:   { name:'类金属', cat:'self', desc:'半导体性质' },
+  noble:       { name:'稀有气体',cat:'self',desc:'不参与化学反应' },
+  inert:       { name:'惰性',   cat:'self', desc:'化学性质极稳定' },
+  heavy:       { name:'重金属', cat:'self', desc:'密度大、毒性强' },
+  catalyst:    { name:'催化',   cat:'self', desc:'提升周围塔的输出' },
+  economy:     { name:'点石成金',cat:'self', desc:'持续产出金币' },
+  lattice:     { name:'晶格',   cat:'self', desc:'同种元素多层叠加形成的晶格结构' },
+  canLattice:  { name:'可晶格', cat:'self', desc:'可与同种元素持续叠加（C₂、C₃、C₄…）' },
+  radioactive: { name:'放射性', cat:'self', desc:'发出核辐射 · 全局增伤所有敌人的受伤' },
 };
 
 const DOTS = {
@@ -113,6 +96,10 @@ const DEFS = {
         hp:40, tier:0, unstable:true },
   F:  { atoms:['F'],  name:'氟原子', symbol:'F',  color:'#c0ffb0', stroke:'#40a030',
         hp:40, tier:0, unstable:true },
+  Br: { atoms:['Br'], name:'溴原子', symbol:'Br', color:'#c87848', stroke:'#804020',
+        hp:40, tier:0, unstable:true },
+  I:  { atoms:['I'],  name:'碘原子', symbol:'I',  color:'#8050a0', stroke:'#402060',
+        hp:40, tier:0, unstable:true },
 
   // ============================================================
   // 稳定单原子
@@ -126,6 +113,9 @@ const DEFS = {
   K:  { atoms:['K'],  name:'钾', symbol:'K',  color:'#ff9060', stroke:'#a04020',
         atk:28, range:200, cd:1.7, hp:130, tier:0,
         tags:['bullet','alkali'], attack:'bullet' },
+  Li: { atoms:['Li'], name:'锂', symbol:'Li', color:'#c8a8e0', stroke:'#8060a0',
+        atk:22, range:230, cd:1.5, hp:130, tier:0,
+        tags:['bullet','alkali'], attack:'bullet' },
   Mg: { atoms:['Mg'], name:'镁', symbol:'Mg', color:'#d8d8c0', stroke:'#808060',
         atk:20, range:240, cd:1.5, hp:150, tier:0,
         tags:['bullet','alkaline'], attack:'bullet' },
@@ -135,14 +125,30 @@ const DEFS = {
   Si: { atoms:['Si'], name:'硅', symbol:'Si', color:'#a8a8c0', stroke:'#505070',
         atk:22, range:270, cd:1.7, hp:160, tier:0,
         tags:['bullet','metalloid'], attack:'bullet' },
+  B:  { atoms:['B'],  name:'硼', symbol:'B',  color:'#a09070', stroke:'#605030',
+        atk:20, range:260, cd:1.7, hp:150, tier:0,
+        tags:['bullet','metalloid'], attack:'bullet' },
+  Ti: { atoms:['Ti'], name:'钛', symbol:'Ti', color:'#d0d0d8', stroke:'#808090',
+        atk:24, range:250, cd:1.6, hp:200, tier:0,
+        tags:['bullet','metal'], attack:'bullet' },
+  Mn: { atoms:['Mn'], name:'锰', symbol:'Mn', color:'#d0a0b0', stroke:'#805060',
+        atk:26, range:260, cd:1.6, hp:180, tier:0,
+        tags:['bullet','metal'], attack:'bullet' },
   Ca: { atoms:['Ca'], name:'钙', symbol:'Ca', color:'#c8c8d8', stroke:'#708090',
         atk:0, range:0, cd:9, hp:260, tier:0,
         tags:['alkaline'], attack:'aura',
         aura:{ target:'tower', type:'shield', value:0.20, radius:140, name:'护盾' } },
   Fe: { atoms:['Fe'], name:'铁', symbol:'Fe', color:'#c8a890', stroke:'#806050',
         atk:0, range:0, cd:9, hp:200, tier:0,
-        tags:['metal'], attack:'aura',
+        tags:['metal','catalyst'], attack:'aura',
         aura:{ target:'tower', type:'damage', value:0.25, radius:150, name:'催化' } },
+  Co: { atoms:['Co'], name:'钴', symbol:'Co', color:'#a0b0d0', stroke:'#506080',
+        atk:0, range:0, cd:9, hp:190, tier:0,
+        tags:['metal','catalyst'], attack:'aura',
+        aura:{ target:'tower', type:'damage', value:0.22, radius:150, name:'催化' } },
+  Ni: { atoms:['Ni'], name:'镍', symbol:'Ni', color:'#c0c8b0', stroke:'#707860',
+        atk:28, range:250, cd:1.5, hp:200, tier:0,
+        tags:['bullet','metal'], attack:'bullet' },
   Cu: { atoms:['Cu'], name:'铜', symbol:'Cu', color:'#e8a878', stroke:'#a06030',
         atk:20, range:280, cd:1.3, hp:160, tier:0,
         tags:['chain','metal'], attack:'bullet',
@@ -155,8 +161,14 @@ const DEFS = {
         tags:['bullet','metal','heavy'], attack:'bullet', bulletEffect:'toxic' },
   Au: { atoms:['Au'], name:'金', symbol:'Au', color:'#ffd166', stroke:'#a08030',
         atk:0, range:0, cd:9, hp:400, tier:0,
-        tags:['inert','metal','economy'], attack:'economy',
+        tags:['inert','metal','economy'], attack:'global',
+        global:'economy', globalName:'经济',
         economy:{ interval:5, gold:8 } },
+  U:  { atoms:['U'],  name:'铀', symbol:'U',  color:'#3a5a3a', stroke:'#1a2a1a',
+        atk:0, range:0, cd:9, hp:260, tier:0,
+        tags:['radioactive','heavy','metal'], attack:'global',
+        global:'radiation', globalName:'辐射',
+        radiationBonus: 0.10 },
   He: { atoms:['He'], name:'氦', symbol:'He', color:'#c8b8ff', stroke:'#8060d0',
         atk:0, range:0, cd:9, hp:120, tier:0,
         tags:['noble'], attack:'aura',
@@ -180,6 +192,14 @@ const DEFS = {
         atk:40, range:0, cd:9, hp:120, tier:1,
         tags:['halogen'], attack:'aura',
         aura:{ target:'enemy', dotKind:'toxic', value:0.25, radius:160, name:'毒气' } },
+  Br2:{ atoms:['Br','Br'],  name:'溴', symbol:'Br₂', color:'#c87848', stroke:'#804020',
+        atk:44, range:0, cd:9, hp:130, tier:1,
+        tags:['halogen'], attack:'aura',
+        aura:{ target:'enemy', dotKind:'toxic', value:0.35, radius:170, name:'溴蒸气' } },
+  I2: { atoms:['I','I'],    name:'碘', symbol:'I₂', color:'#a070c0', stroke:'#503080',
+        atk:0, range:0, cd:9, hp:180, tier:1,
+        tags:['halogen'], attack:'aura',
+        aura:{ target:'enemy', dotKind:'toxic', value:0.30, radius:150, name:'碘蒸气' } },
   F2: { atoms:['F','F'],    name:'氟气', symbol:'F₂', color:'#d0ffb8', stroke:'#50a030',
         atk:60, range:280, cd:2.0, hp:100, tier:1,
         tags:['halogen','nonmetal'], attack:'bullet',
@@ -192,6 +212,16 @@ const DEFS = {
         atk:44, range:300, cd:1.4, hp:110, tier:1,
         tags:['acid','halogen'], attack:'bullet',
         bulletMode:'splash', splashRadius:60, splashRatio:0.6,
+        bulletEffect:'acid' },
+  HBr:{ atoms:['H','Br'],   name:'氢溴酸', symbol:'HBr', color:'#c89060', stroke:'#804020',
+        atk:52, range:340, cd:1.6, hp:120, tier:1,
+        tags:['acid','halogen','pierce'], attack:'bullet',
+        bulletMode:'pierce', pierceRange:340,
+        bulletEffect:'acid' },
+  HI: { atoms:['H','I'],    name:'氢碘酸', symbol:'HI', color:'#a080c0', stroke:'#503080',
+        atk:64, range:350, cd:1.8, hp:110, tier:1,
+        tags:['acid','halogen','pierce'], attack:'bullet',
+        bulletMode:'pierce', pierceRange:360,
         bulletEffect:'acid' },
   CO: { atoms:['C','O'],    name:'一氧化碳', symbol:'CO', color:'#808080', stroke:'#303030',
         atk:32, range:340, cd:1.5, hp:130, tier:1,
@@ -218,15 +248,77 @@ const DEFS = {
   KCl:{ atoms:['K','Cl'],   name:'氯化钾', symbol:'KCl', color:'#e8f0c8', stroke:'#90a060',
         atk:28, range:280, cd:1.6, hp:170, tier:1,
         tags:['bullet','salt','alkali'], attack:'bullet' },
-  NaCl:{ atoms:['Na','Cl'],  name:'氯化钠', symbol:'NaCl', color:'#eef4c8', stroke:'#98b060',
-      atk:26, range:280, cd:1.6, hp:170, tier:1,
-      tags:['bullet','salt','alkali'], attack:'bullet' },
+  NaCl:{ atoms:['Na','Cl'], name:'氯化钠', symbol:'NaCl', color:'#eef4c8', stroke:'#98b060',
+        atk:26, range:280, cd:1.6, hp:170, tier:1,
+        tags:['bullet','salt','alkali'], attack:'bullet' },
+  LiCl:{ atoms:['Li','Cl'], name:'氯化锂', symbol:'LiCl', color:'#d8c8e8', stroke:'#9070a0',
+        atk:24, range:270, cd:1.6, hp:170, tier:1,
+        tags:['bullet','salt','alkali'], attack:'bullet' },
   AgCl:{ atoms:['Ag','Cl'], name:'氯化银', symbol:'AgCl', color:'#e0e0e8', stroke:'#9098a0',
         atk:38, range:300, cd:1.6, hp:160, tier:1,
         tags:['bullet','metal','heavy'], attack:'bullet', bulletEffect:'toxic' },
-  SiC:{ atoms:['Si','C'],   name:'碳化硅', symbol:'SiC', color:'#a0a0a8', stroke:'#505058',
+  AgBr:{ atoms:['Ag','Br'], name:'溴化银', symbol:'AgBr', color:'#d8c8b0', stroke:'#908050',
+        atk:40, range:300, cd:1.6, hp:160, tier:1,
+        tags:['bullet','metal','heavy'], attack:'bullet', bulletEffect:'toxic' },
+  AgI: { atoms:['Ag','I'],  name:'碘化银', symbol:'AgI', color:'#b0a0c0', stroke:'#605080',
+        atk:44, range:310, cd:1.7, hp:170, tier:1,
+        tags:['bullet','metal','heavy'], attack:'bullet', bulletEffect:'toxic' },
+  NaBr:{ atoms:['Na','Br'], name:'溴化钠', symbol:'NaBr', color:'#e0d0c0', stroke:'#a08060',
+        atk:30, range:280, cd:1.6, hp:180, tier:1,
+        tags:['bullet','salt'], attack:'bullet' },
+  KBr: { atoms:['K','Br'],  name:'溴化钾', symbol:'KBr', color:'#e0d0b0', stroke:'#a08040',
+        atk:32, range:280, cd:1.6, hp:180, tier:1,
+        tags:['bullet','salt'], attack:'bullet' },
+  KI:  { atoms:['K','I'],   name:'碘化钾', symbol:'KI',  color:'#d0c0e0', stroke:'#8060a0',
+        atk:34, range:290, cd:1.7, hp:190, tier:1,
+        tags:['bullet','salt'], attack:'bullet' },
+  NaF: { atoms:['Na','F'],  name:'氟化钠', symbol:'NaF', color:'#e0ffd0', stroke:'#80b060',
+        atk:34, range:280, cd:1.6, hp:160, tier:1,
+        tags:['bullet','halogen','salt'], attack:'bullet', bulletEffect:'toxic' },
+  SiC: { atoms:['Si','C'],  name:'碳化硅', symbol:'SiC', color:'#a0a0a8', stroke:'#505058',
         atk:36, range:260, cd:1.8, hp:260, tier:1,
         tags:['bullet','metalloid'], attack:'bullet' },
+  BN:  { atoms:['B','N'],   name:'氮化硼', symbol:'BN',  color:'#e8e8f0', stroke:'#9090a0',
+        atk:32, range:280, cd:2.0, hp:300, tier:1,
+        tags:['bullet','metalloid'], attack:'bullet',
+        reflect:0.30 },
+  UO:  { atoms:['U','O'],   name:'一氧化铀', symbol:'UO', color:'#4a5a3a', stroke:'#2a3a1a',
+        atk:30, range:270, cd:1.7, hp:230, tier:1,
+        tags:['bullet','radioactive','heavy','metal'], attack:'bullet',
+        global:'radiation', globalName:'辐射',
+        radiationBonus: 0.06 },
+  TiO2:{ atoms:['Ti','O','O'], name:'二氧化钛', symbol:'TiO₂', color:'#e0e0e8', stroke:'#9090a0',
+        atk:36, range:270, cd:1.8, hp:280, tier:2,
+        tags:['bullet','metal','knockback'], attack:'bullet',
+        bulletMode:'knockback', knockbackDist:110 },
+  MnO2:{ atoms:['Mn','O','O'], name:'二氧化锰', symbol:'MnO₂', color:'#b07080', stroke:'#603040',
+        atk:38, range:280, cd:1.8, hp:250, tier:2,
+        tags:['bullet','metal','knockback'], attack:'bullet',
+        bulletMode:'knockback', knockbackDist:100 },
+  CoCl2:{ atoms:['Co','Cl','Cl'], name:'氯化钴', symbol:'CoCl₂', color:'#a0b0d0', stroke:'#506080',
+        atk:36, range:280, cd:1.7, hp:220, tier:2,
+        tags:['bullet','salt','metal','knockback'], attack:'bullet',
+        bulletMode:'knockback', knockbackDist:90 },
+  NiO: { atoms:['Ni','O'],  name:'氧化镍', symbol:'NiO', color:'#c0c8b0', stroke:'#707860',
+        atk:34, range:290, cd:1.7, hp:230, tier:1,
+        tags:['bullet','metal','knockback'], attack:'bullet',
+        bulletMode:'knockback', knockbackDist:85 },
+  CoO: { atoms:['Co','O'],  name:'氧化钴', symbol:'CoO', color:'#90a0c0', stroke:'#405070',
+        atk:32, range:280, cd:1.7, hp:220, tier:1,
+        tags:['bullet','metal'], attack:'bullet' },
+  Li2O:{ atoms:['Li','Li','O'], name:'氧化锂', symbol:'Li₂O', color:'#d8c8e8', stroke:'#9070a0',
+        atk:30, range:260, cd:1.8, hp:200, tier:2,
+        tags:['bullet','alkali'], attack:'bullet' },
+  B2O3:{ atoms:['B','B','O','O','O'], name:'三氧化二硼', symbol:'B₂O₃', color:'#c8b898', stroke:'#807040',
+        atk:34, range:280, cd:1.9, hp:230, tier:3,
+        tags:['bullet','metalloid'], attack:'bullet' },
+  TiCl4:{ atoms:['Ti','Cl','Cl','Cl','Cl'], name:'四氯化钛', symbol:'TiCl₄', color:'#d8d8e0', stroke:'#808090',
+        atk:44, range:300, cd:1.9, hp:210, tier:4,
+        tags:['bullet','halogen','metal'], attack:'bullet', bulletEffect:'acid' },
+  TiN: { atoms:['Ti','N'],  name:'氮化钛', symbol:'TiN', color:'#c8b880', stroke:'#806830',
+        atk:38, range:260, cd:1.9, hp:340, tier:1,
+        tags:['bullet','metal'], attack:'bullet',
+        reflect:0.25 },
 
   // ============================================================
   // 三原子分子
@@ -258,11 +350,18 @@ const DEFS = {
         atk:0, range:0, cd:9, hp:190, tier:2,
         tags:['alkaline'], attack:'aura',
         aura:{ target:'tower', type:'shield', value:0.25, radius:150, name:'护盾' } },
+  LiOH:{ atoms:['Li','O','H'], name:'氢氧化锂', symbol:'LiOH', color:'#d8c8e8', stroke:'#9070a0',
+        atk:0, range:0, cd:9, hp:180, tier:2,
+        tags:['alkaline'], attack:'aura',
+        aura:{ target:'tower', type:'shield', value:0.22, radius:140, name:'护盾' } },
   MgCl2:{ atoms:['Mg','Cl','Cl'], name:'氯化镁', symbol:'MgCl₂', color:'#d8e0c8', stroke:'#809060',
         atk:30, range:280, cd:1.6, hp:200, tier:2,
         tags:['bullet','salt'], attack:'bullet' },
   ZnCl2:{ atoms:['Zn','Cl','Cl'], name:'氯化锌', symbol:'ZnCl₂', color:'#c8d0c8', stroke:'#708070',
         atk:32, range:280, cd:1.6, hp:200, tier:2,
+        tags:['bullet','salt','metal'], attack:'bullet' },
+  NiCl2:{ atoms:['Ni','Cl','Cl'], name:'氯化镍', symbol:'NiCl₂', color:'#b8c0a0', stroke:'#687040',
+        atk:34, range:280, cd:1.6, hp:210, tier:2,
         tags:['bullet','salt','metal'], attack:'bullet' },
   SiO2:{ atoms:['Si','O','O'], name:'二氧化硅', symbol:'SiO₂', color:'#e0e0f0', stroke:'#9090a0',
         atk:28, range:260, cd:1.8, hp:300, tier:2,
@@ -274,11 +373,42 @@ const DEFS = {
   K2O:{ atoms:['K','K','O'],  name:'氧化钾', symbol:'K₂O', color:'#ffb8a0', stroke:'#a05840',
         atk:34, range:240, cd:1.8, hp:180, tier:2,
         tags:['bullet','alkali'], attack:'bullet' },
+  UO2:{ atoms:['U','O','O'], name:'二氧化铀', symbol:'UO₂', color:'#4a3a2a', stroke:'#2a1a0a',
+        atk:34, range:280, cd:1.8, hp:280, tier:2,
+        tags:['bullet','radioactive','heavy','metal'], attack:'bullet',
+        global:'radiation', globalName:'辐射',
+        radiationBonus: 0.08 },
+  Li2CO3:{ atoms:['Li','Li','C','O','O','O'], name:'碳酸锂', symbol:'Li₂CO₃', color:'#c8b8e0', stroke:'#8060a0',
+        atk:38, range:320, cd:1.8, hp:230, tier:5,
+        tags:['splash','salt','alkali'], attack:'bullet',
+        bulletMode:'splash', splashRadius:110, splashRatio:0.5 },
+  H3BO3:{ atoms:['H','H','H','B','O','O','O'], name:'硼酸', symbol:'H₃BO₃', color:'#d0c8a8', stroke:'#908060',
+        atk:44, range:320, cd:1.9, hp:150, tier:4,
+        tags:['acid'], attack:'bullet',
+        bulletMode:'splash', splashRadius:80, splashRatio:0.5,
+        bulletEffect:'acid' },
+  BCl3:{ atoms:['B','Cl','Cl','Cl'], name:'三氯化硼', symbol:'BCl₃', color:'#b8c8a8', stroke:'#708060',
+        atk:44, range:300, cd:1.7, hp:180, tier:3,
+        tags:['bullet','halogen','metalloid'], attack:'bullet', bulletEffect:'acid' },
   HNO3:{ atoms:['H','N','O','O','O'], name:'硝酸', symbol:'HNO₃', color:'#ff9a9a', stroke:'#a05050',
         atk:48, range:320, cd:1.6, hp:120, tier:3,
         tags:['acid'], attack:'bullet',
         bulletMode:'splash', splashRadius:70, splashRatio:0.5,
         bulletEffect:'acid' },
+  KMnO4:{ atoms:['K','Mn','O','O','O','O'], name:'高锰酸钾', symbol:'KMnO₄', color:'#c060a0', stroke:'#702060',
+        atk:68, range:340, cd:2.2, hp:140, tier:4,
+        tags:['splash','acid','metal'], attack:'bullet',
+        bulletMode:'splash', splashRadius:130, splashRatio:0.6,
+        bulletEffect:'acid' },
+  MnSO4:{ atoms:['Mn','S','O','O','O','O'], name:'硫酸锰', symbol:'MnSO₄', color:'#c890a0', stroke:'#704060',
+        atk:38, range:300, cd:1.7, hp:230, tier:4,
+        tags:['bullet','salt','metal'], attack:'bullet' },
+  CoSO4:{ atoms:['Co','S','O','O','O','O'], name:'硫酸钴', symbol:'CoSO₄', color:'#90a8c8', stroke:'#405878',
+        atk:40, range:300, cd:1.7, hp:240, tier:4,
+        tags:['bullet','salt','metal'], attack:'bullet' },
+  NiSO4:{ atoms:['Ni','S','O','O','O','O'], name:'硫酸镍', symbol:'NiSO₄', color:'#b0c898', stroke:'#607840',
+        atk:42, range:310, cd:1.7, hp:240, tier:4,
+        tags:['bullet','salt','metal'], attack:'bullet' },
 
   // ============================================================
   // 四原子及以上
@@ -390,9 +520,11 @@ const DEFS = {
         tags:['bullet','halogen','nonmetal'], attack:'bullet',
         bulletMode:'splash', splashRadius:80, splashRatio:0.5,
         bulletEffect:'acid' },
-  NaF:{ atoms:['Na','F'], name:'氟化钠', symbol:'NaF', color:'#e0ffd0', stroke:'#80b060',
-        atk:34, range:280, cd:1.6, hp:160, tier:1,
-        tags:['bullet','halogen','salt'], attack:'bullet', bulletEffect:'toxic' },
+  CBr4:{ atoms:['C','Br','Br','Br','Br'], name:'四溴化碳', symbol:'CBr₄', color:'#c89878', stroke:'#805030',
+        atk:48, range:320, cd:2.0, hp:180, tier:4,
+        tags:['bullet','halogen','nonmetal'], attack:'bullet',
+        bulletMode:'splash', splashRadius:90, splashRatio:0.5,
+        bulletEffect:'toxic' },
   AgNO3:{ atoms:['Ag','N','O','O','O'], name:'硝酸银', symbol:'AgNO₃', color:'#e8e8f0', stroke:'#9098a0',
         atk:48, range:320, cd:1.8, hp:170, tier:4,
         tags:['acid','metal','heavy'], attack:'bullet',
@@ -404,10 +536,114 @@ const DEFS = {
   Ag2S:{ atoms:['Ag','Ag','S'], name:'硫化银', symbol:'Ag₂S', color:'#a0a0a8', stroke:'#505058',
         atk:42, range:280, cd:1.8, hp:190, tier:2,
         tags:['bullet','metal','heavy'], attack:'bullet', bulletEffect:'toxic' },
+  // ★ 铀化合物：更强、更贵
+  UF6: { atoms:['U','F','F','F','F','F','F'], name:'六氟化铀', symbol:'UF₆', color:'#5a6a4a', stroke:'#2a3a1a',
+        atk:50, range:340, cd:2.0, hp:160, tier:5,
+        tags:['bullet','radioactive','halogen','acid','heavy'], attack:'bullet',
+        bulletMode:'pierce', pierceRange:340,
+        bulletEffect:'acid',
+        global:'radiation', globalName:'辐射',
+        radiationBonus: 0.12 },
+  U3O8:{ atoms:['U','U','U','O','O','O','O','O'], name:'八氧化三铀', symbol:'U₃O₈', color:'#3a2a1a', stroke:'#1a0a00',
+        atk:44, range:320, cd:2.2, hp:420, tier:6,
+        tags:['bullet','radioactive','heavy','metal'], attack:'bullet',
+        bulletMode:'splash', splashRadius:100, splashRatio:0.5,
+        global:'radiation', globalName:'辐射',
+        radiationBonus: 0.15 },
   C6H6:{ atoms:['C','C','C','C','C','C','H','H','H','H','H','H'], name:'苯', symbol:'C₆H₆', color:'#e8c060', stroke:'#a08030',
         atk:34, range:320, cd:1.6, hp:180, tier:6,
         tags:['burst','flammable'], attack:'bullet',
         bulletMode:'burst', burstCount:3 },
+};
+
+// ============================================================
+// 晶格元素
+// ============================================================
+const LATTICE_ELEMENTS = {
+  C: {
+    name:'碳晶格', color:'#3a3a3a', stroke:'#000',
+    maxN: 12, tag: 'flammable',
+    baseAtk: 26, baseHp: 120, baseRange: 260, baseCd: 1.4,
+    atkLog: 0.55, hpMul: 1.1, rangePerN: 0.05, cdPerN: -0.05,
+    special: [
+      { n: 4,  mode: 'splash', radius: 90, ratio: 0.5 },
+      { n: 8,  mode: 'burst', count: 3 },
+      { n: 12, mode: 'pierce' },
+    ],
+  },
+  Si: {
+    name:'硅晶格', color:'#7a7a9a', stroke:'#404060',
+    maxN: 10, tag: 'metalloid',
+    baseAtk: 28, baseHp: 160, baseRange: 270, baseCd: 1.6,
+    atkLog: 0.50, hpMul: 1.2, rangePerN: 0.06, cdPerN: -0.05,
+    special: [
+      { n: 4, mode: 'pierce' },
+      { n: 8, mode: 'splash', radius: 100, ratio: 0.6 },
+    ],
+  },
+  Fe: {
+    name:'铁晶格', color:'#a08060', stroke:'#503020',
+    maxN: 8, tag: 'metal',
+    baseAtk: 30, baseHp: 200, baseRange: 240, baseCd: 1.5,
+    atkLog: 0.55, hpMul: 1.3, rangePerN: 0.04, cdPerN: -0.05,
+    special: [
+      { n: 3, mode: 'burst', count: 2 },
+      { n: 6, mode: 'burst', count: 3 },
+    ],
+  },
+  Cu: {
+    name:'铜晶格', color:'#c88060', stroke:'#803020',
+    maxN: 8, tag: 'metal',
+    baseAtk: 28, baseHp: 160, baseRange: 280, baseCd: 1.3,
+    atkLog: 0.50, hpMul: 1.2, rangePerN: 0.05, cdPerN: -0.06,
+    special: [
+      { n: 3, mode: 'chain', count: 3 },
+      { n: 6, mode: 'chain', count: 4 },
+    ],
+  },
+  Ag: {
+    name:'银晶格', color:'#d0d0d8', stroke:'#707880',
+    maxN: 6, tag: 'metal',
+    baseAtk: 34, baseHp: 150, baseRange: 300, baseCd: 1.4,
+    atkLog: 0.60, hpMul: 1.1, rangePerN: 0.06, cdPerN: -0.05,
+    special: [
+      { n: 3, mode: 'chain', count: 3 },
+      { n: 5, mode: 'pierce' },
+    ],
+  },
+  Ti: {
+    name:'钛晶格', color:'#a8a8b0', stroke:'#505058',
+    maxN: 8, tag: 'metal',
+    baseAtk: 30, baseHp: 240, baseRange: 250, baseCd: 1.6,
+    atkLog: 0.50, hpMul: 1.4, rangePerN: 0.03, cdPerN: -0.05,
+    special: [
+      { n: 4, mode: 'knockback', dist: 90 },
+      { n: 7, mode: 'knockback', dist: 140 },
+    ],
+  },
+  B: {
+    name:'硼晶格', color:'#908060', stroke:'#403020',
+    maxN: 8, tag: 'metalloid',
+    baseAtk: 26, baseHp: 150, baseRange: 260, baseCd: 1.7,
+    atkLog: 0.55, hpMul: 1.3, rangePerN: 0.05, cdPerN: -0.05,
+    special: [
+      { n: 5, mode: 'splash', radius: 100, ratio: 0.5 },
+    ],
+  },
+  U: {
+    name:'铀晶格', color:'#2a4a2a', stroke:'#0a1a0a',
+    maxN: 6, tag: 'radioactive',
+    baseAtk: 40, baseHp: 260, baseRange: 280, baseCd: 1.8,
+    atkLog: 0.55, hpMul: 1.4, rangePerN: 0.05, cdPerN: -0.05,
+    special: [
+      { n: 3, mode: 'splash', radius: 100, ratio: 0.5 },
+      { n: 5, mode: 'pierce' },
+    ],
+    // ★ 晶格本身也是辐射源
+    radiationBonus: 0.05,
+    global: 'radiation',
+    globalName: '辐射',
+  },
 };
 
 const SPECIAL_REACTIONS = [
@@ -415,12 +651,14 @@ const SPECIAL_REACTIONS = [
   { a:'Na', b:'H2O2', damage:300, radius:500, hint:'Na + H₂O₂ → 剧烈爆炸', keep:'H2O2' },
   { a:'K',  b:'H2O',  damage:320, radius:520, hint:'K + H₂O → 剧烈爆炸', keep:'H2O' },
   { a:'K',  b:'H2O2', damage:380, radius:560, hint:'K + H₂O₂ → 大爆炸', keep:'H2O2' },
+  { a:'Li', b:'H2O',  damage:220, radius:420, hint:'Li + H₂O → 爆炸', keep:'H2O' },
   { a:'Ca', b:'H2O',  damage:200, radius:400, hint:'Ca + H₂O → 反应', keep:'H2O' },
   { a:'Mg', b:'H2O',  damage:180, radius:360, hint:'Mg + H₂O → 反应', keep:'H2O' },
   { a:'Cl2',b:'H2O',  damage:180, radius:360, hint:'Cl₂ + H₂O → 反应', keep:'H2O' },
   { a:'F2', b:'H2O',  damage:280, radius:480, hint:'F₂ + H₂O → 剧烈反应', keep:'H2O' },
   { a:'F2', b:'H2',   damage:400, radius:520, hint:'F₂ + H₂ → 爆炸', keep:'HF' },
   { a:'Na', b:'Cl2',  damage:260, radius:440, hint:'Na + Cl₂ → 反应', keep:'NaCl' },
+  { a:'Li', b:'Cl2',  damage:240, radius:420, hint:'Li + Cl₂ → 反应', keep:'LiCl' },
 ];
 
 const ENEMY_TYPES = {

@@ -35,6 +35,7 @@ function render() {
   ctx.setLineDash([]);
 
   if (state.showAuras) {
+    // 光环圈（以塔为中心）
     for (const u of state.units) {
       if (u.isIntermediate) continue;
       const def = DEFS[u.key];
@@ -49,16 +50,22 @@ function render() {
       ctx.stroke();
       ctx.setLineDash([]);
     }
+
+    // 塔-塔连线
     for (let i = 0; i < state.units.length; i++) {
       for (let j = i + 1; j < state.units.length; j++) {
         const a = state.units[i], b = state.units[j];
         if (a.isIntermediate || b.isIntermediate) continue;
         const da = DEFS[a.key] && DEFS[a.key].aura;
         const db = DEFS[b.key] && DEFS[b.key].aura;
-        const hasTowerAura = (da && da.target === 'tower') || (db && db.target === 'tower');
-        if (!hasTowerAura) continue;
+        const aTower = da && da.target === 'tower';
+        const bTower = db && db.target === 'tower';
+        if (!aTower && !bTower) continue;
+
         const d = Math.hypot(a.x - b.x, a.y - b.y);
-        if (d < WORLD.AURA_RADIUS) {
+        const aAffects = aTower && d < da.radius + b.radius;
+        const bAffects = bTower && d < db.radius + a.radius;
+        if (aAffects || bAffects) {
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
           ctx.lineTo(b.x, b.y);
@@ -123,11 +130,18 @@ function render() {
     const hover = state.hoveredUnit;
     const handKey = state.hand[state.selectedHand].key;
     const merged = [...hover.atoms, ...DEFS[handKey].atoms].sort();
-    const molKey = findMoleculeMatch(merged);
+
     let previewSym = null;
-    if (molKey) previewSym = DEFS[molKey].symbol;
-    else if (merged.length >= 2 && findSupersetMolecule(merged)) {
-      previewSym = buildIntermediateSymbol(merged);
+
+    const latticeKey = ensureLatticeDef(getLatticeKey(merged));
+    if (latticeKey) {
+      previewSym = DEFS[latticeKey].symbol;
+    } else {
+      const molKey = findMoleculeMatch(merged);
+      if (molKey) previewSym = DEFS[molKey].symbol;
+      else if (merged.length >= 2 && findSupersetMolecule(merged)) {
+        previewSym = buildIntermediateSymbol(merged);
+      }
     }
 
     let specialReaction = null;
@@ -304,9 +318,43 @@ function drawPopup(p, isWorld) {
   ctx.globalAlpha = 1;
 }
 
+// ============================================================
+// 全局效果塔的视觉标识
+// ============================================================
+
+// 全局类型 → 标识颜色
+function getGlobalColor(globalType) {
+  switch (globalType) {
+    case 'radiation':  return '#7adb7a';   // 辐射绿
+    case 'combustion': return '#ffaa3a';   // 助燃橙
+    case 'economy':    return '#ffd166';   // 经济金
+    default:           return '#ffd166';
+  }
+}
+
 function drawUnit(u, showRange) {
   const def = DEFS[u.key];
   const r = u.radius;
+
+  // ★ 全局效果塔的颜色标识（非中间体）
+  const globalColor =
+    (!u.isIntermediate && def && def.global)
+      ? getGlobalColor(def.global)
+      : null;
+
+  // ① 全局塔的背景光晕（塔身之前绘制，衬托效果）
+  if (globalColor) {
+    const pulse = 0.85 + Math.sin(state.time * 2.4 + u.x * 0.01) * 0.15;
+    const glowR = (r + 26) * pulse;
+    const glow = ctx.createRadialGradient(u.x, u.y, r * 0.4, u.x, u.y, glowR);
+    glow.addColorStop(0.0, hexToRgba(globalColor, 0));
+    glow.addColorStop(0.45, hexToRgba(globalColor, 0.28));
+    glow.addColorStop(1.0, hexToRgba(globalColor, 0));
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(u.x, u.y, glowR, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   if (showRange && !u.isIntermediate && u.range > 0) {
     ctx.beginPath();
@@ -341,13 +389,11 @@ function drawUnit(u, showRange) {
     ctx.arc(u.x, u.y, r + 10, 0, Math.PI * 2);
     ctx.fill();
 
-    // 主体：半透明填充（体现"不完整"）
     ctx.beginPath();
     ctx.arc(u.x, u.y, r, 0, Math.PI * 2);
     ctx.fillStyle = hexToRgba(def.color, 0.35);
     ctx.fill();
 
-    // 虚线描边（暖橙，与合成预览一致）
     ctx.beginPath();
     ctx.arc(u.x, u.y, r, 0, Math.PI * 2);
     ctx.strokeStyle = 'rgba(255, 180, 80, 0.85)';
@@ -363,7 +409,6 @@ function drawUnit(u, showRange) {
       ctx.fill();
     }
 
-    // symbol：白色半透明
     ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
     ctx.font = `bold ${Math.max(14, r * 0.8)}px system-ui`;
     ctx.textAlign = 'center';
@@ -374,6 +419,7 @@ function drawUnit(u, showRange) {
     return;
   }
 
+  // ---- 普通塔身 ----
   ctx.beginPath();
   ctx.arc(u.x, u.y + 4, r + 3, 0, Math.PI * 2);
   ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
@@ -407,6 +453,24 @@ function drawUnit(u, showRange) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(def.symbol, u.x, u.y);
+
+  // ② ★ 全局塔的旋转虚线环
+  if (globalColor) {
+    const rot = state.time * 1.1;
+
+    // 旋转虚线环
+    ctx.save();
+    ctx.translate(u.x, u.y);
+    ctx.rotate(rot);
+    ctx.beginPath();
+    ctx.arc(0, 0, r + 11, 0, Math.PI * 2);
+    ctx.strokeStyle = globalColor;
+    ctx.lineWidth = 2.5 / camera.zoom;
+    ctx.setLineDash([9 / camera.zoom, 7 / camera.zoom]);
+    ctx.stroke();
+    ctx.restore();
+    ctx.setLineDash([]);
+  }
 
   drawHpArc(u, r + 14 / camera.zoom);
 }
@@ -447,7 +511,6 @@ function drawEnemy(e, selected) {
   ctx.fillStyle = hexToRgba(e.color, 0.14);
   ctx.fill();
 
-  // 状态外环 —— 只依赖 DOTS 表
   const dots = e.dots || {};
   const dotKinds = Object.keys(dots);
   for (let i = 0; i < dotKinds.length; i++) {
@@ -513,7 +576,6 @@ function drawEnemy(e, selected) {
     ctx.stroke();
   }
 
-  // 状态图标 —— 也只依赖 DOTS 表
   for (let i = 0; i < dotKinds.length; i++) {
     const d = DOTS[dotKinds[i]];
     if (!d) continue;
